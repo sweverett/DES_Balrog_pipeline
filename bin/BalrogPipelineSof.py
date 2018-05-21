@@ -326,7 +326,7 @@ def makeChunk(inpar):
 
 #    print seedlist
     seedN = seedlist[cnum-1]
-    print seedN
+#    print seedN
     command = ['run_ngmixit','--nranges', '16',  '--wrange', '1' ,'--tilename', tilename]
     command += ['--meds_list',medslist,'--bands','g,r,i,z']
     command += ['--psf-map', psfmapF]
@@ -972,10 +972,10 @@ class BalrogPipelineSof():
     " Prepare data for meds run on simulated images "
     def prepInData(self):
         " make list of realisations "
-        realisationslist = os.listdir(self.simData)
-        " each realisation contains tilename subrirectory "
-        for realD in realisationslist:
-            " new meds dir is simData+/realisatiuon+ tilename"
+        realizationslist = os.listdir(self.simData)
+        " each realization contains tilename subrirectory "
+        for realD in realizationslist:
+            " new meds dir is simData+/realization+ tilename"
             self.realDir = os.path.abspath(self.simData+'/'+str(realD)+'/'+self.tilename)
             print " realDir=%s \n" % self.realDir
             " create subdirectories in the realisation directory "
@@ -1013,10 +1013,14 @@ class BalrogPipelineSof():
                 " We just need to copy and rename injected files in nullweight "
                 srcDir = self.realDir + '/'+str(band) + '/'
                 dstDir = self.realDir + '/nullwt-'+str(band) +'/'
+		print "srcDir=%s \n" % srcDir
+		print "dstDir=%s \n" % dstDir
                 flist = glob.glob(srcDir+'*')
                 for fileN in flist:
-                    realF = fileN.split(band+'/')[1]
+		    realF = fileN.split('/'+band+'/')[1]
                     dstFN = realF.split('balrog')[0]+'immasked_nullwt.fits'
+		    print "realF=%s \n" % realF
+		    print " dstFN=%s \n" % dstFN
                     shutil.copyfile(fileN, dstDir+dstFN)
                 " Finally correct file config yaml "
                 self.YamlCorrect(band,self.realDir)
@@ -1179,12 +1183,12 @@ if __name__ == "__main__":
 #    balP.prepMeds()
     datadir = balP.tiledir
      
-    saveS = True
+    saveS = False
     print "save seeds ",saveS
     print "\n"
     
 
-    ncpu = len(balP.bands)#
+    ncpu = len(balP.bands)
 #
     args= balP.getCoaddPars(datadir)
     pars = [(args, band) for band in balP.bands ]
@@ -1196,11 +1200,11 @@ if __name__ == "__main__":
 #    pool.close()
 #    pool.join()
     coaddir = datadir+'/coadd'
-#    print 'det image data dir = %s \n' % coaddir
+    print 'det image data dir = %s \n' % coaddir
 #    balP.makeDetectionImage(coaddir)
 #
 #    balP.cleanCoadds(coaddir)
-#    
+    
 #    pool = Pool(processes=ncpu)
 #    pool.map(makeCatalog,pars)
 #    
@@ -1212,24 +1216,24 @@ if __name__ == "__main__":
 #    
 #    pool.close()
 #    pool.join()
-    nchunks = 16
-    seedlist = makeSeedList(nchunks)
-    if saveS:
-    	with open('seedL1', 'wb') as fp:
-           pickle.dump(seedlist, fp)
-    else:
-        with open ('seedL1_base', 'rb') as fp:
-           seedlist = pickle.load(fp)
-    print " Seeds for base \n"
-    print seedlist
-    args =balP.getMofPars(datadir)
-    args['mofdir'] = datadir+'/sof'
-    args['datadir'] = datadir
-    args['seedlist'] = seedlist
+#    nchunks = 16
+#    seedlist = makeSeedList(nchunks)
+#    if saveS:
+#    	with open('seedL1', 'wb') as fp:
+#           pickle.dump(seedlist, fp)
+#    else:
+#        with open ('seedL1_base', 'rb') as fp:
+#           seedlist = pickle.load(fp)
+#    print " Seeds for base \n"
+#    print seedlist
+#    args =balP.getMofPars(datadir)
+#    args['mofdir'] = datadir+'/sof'
+#    args['datadir'] = datadir
+#    args['seedlist'] = seedlist
     
 #    balP.make_nbrs_data(datadir)
 
-    pars = [(args, chunks) for chunks in range(1,17) ]
+#   pars = [(args, chunks) for chunks in range(1,17) ]
 #    print pars
 #
 #    pool = Pool(processes=16)
@@ -1263,12 +1267,10 @@ if __name__ == "__main__":
    
 #    output_dir =  basedir
 #    command = "./Balrog-GalSim/balrog/balrog_injection.py -l %s -g %s -t %s -c %s   -o %s -v %s " % (tilelistS,geom_file,tile_dir,config_dir,output_dir,config_file) 
-    
 #    print command
-#    res=''
+#    retval=''
 #    try:
-#        retval = subprocess.call(command.split(),stderr=subprocess.STDOUT)
-#        
+#        retval = subprocess.call(command.split(),stderr=subprocess.STDOUT)        
 #    except subprocess.CalledProcessError as e:
 #        print "error %s"% e
 #        print retval
@@ -1292,7 +1294,7 @@ if __name__ == "__main__":
 #       
         coaddir = datadir+'/coadd'
         balP.makeDetectionImage(coaddir)
-#
+
         balP.cleanCoadds(coaddir)
 #    
         pool = Pool(processes=ncpu)
