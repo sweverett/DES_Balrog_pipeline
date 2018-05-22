@@ -19,14 +19,14 @@ setup despydb
 setup IntegrationUtils 2.0.9+1
 setup ngmix
 setup covmatrix 0.9.0+1 
-export PYTHONPATH=/data/des71.a/data/kuropat/Balrog-GalSim/balrog:${PYTHONPATH}
+export PYTHONPATH=/data/des61.a/data/severett/Balrog-GalSim/balrog:${PYTHONPATH}
 #
-export BALROG_BASE=/data/des71.a/data/kuropat/balrog-base
+export BALROG_BASE=/data/des61.a/data/severett/DES_Balrog_pipeline
 #
-export PYTHONPATH=$PYTHONPATH:/data/des71.a/data/kuropat/balrog-base/lib/python2.7/site-packages/
+export PYTHONPATH=$PYTHONPATH:/data/des61.a/data/severett/DES_Balrog_pipeline/lib/python2.7/site-packages/
 export DESMEDS_CONFIG_DIR=${BALROG_BASE}/desmeds-config/
 #
-export MEDS_DATA=/data/des71.a/data/kuropat/${medsdir}/
+export MEDS_DATA=/data/des61.a/data/severett/${medsdir}/
 export DESDATA=${BALROG_BASE}/DESDATA
 export PYTHONPATH=${BALROG_BASE}/mof/ngmixer/y3v0.9.4a+1/python:$PYTHONPATH
 export PATH=${BALROG_BASE}/mof/ngmixer/y3v0.9.4a+1/bin:$PATH
