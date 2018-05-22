@@ -1,9 +1,11 @@
 #!/usr/bin/env python
+
 """ The program to organize all steps necessary to produce
  meds and sof files for Balrog project
- 
+
  By N. Kuropatkin  12/06/2017
  """
+
 import os
 import sys
 import math
@@ -16,7 +18,6 @@ import fitsio
 import pickle
 from despyastro import wcsutil
 
-#
 import time
 import timeit
 from time import sleep
@@ -42,7 +43,6 @@ except:
     def colored(line, color):
         return line
 
-
 # The query template used to get the geometry of the tile
 QUERY_GEOM = """
     SELECT ID, PIXELSCALE, NAXIS1, NAXIS2,
@@ -65,20 +65,27 @@ def makeCoadd(inpar):
     naxis1 = args['naxis1']
     naxis2 = args['naxis2']
     pixscale = args['pixscale']
-   
     outpath = args['outpath']
     logpath = args['logpath']
     tilename = args['tilename']
     print "Make coadd band=%s \n" % band
     restemp = outpath+'/'+tilename+'_'+band
-    (images,weights,masks,fluxes) = create_swarp_lists(args,band)
-    SWARPcaller(images,weights,fluxes,masks,ra_cent,dec_cent,naxis1,naxis2,pixscale,restemp)
+
+    (images, weights, masks, fluxes) = create_swarp_lists(args,band)
+
+    # TODO: This call signature is inconsistent with below!
+    # OLD:
+    # SWARPcaller(images, weights, fluxes, masks, ra_cent, dec_cent, naxis1, naxis2, pixscale, restemp)
+    # MINE:
+    SWARPcaller(images, weights, masks, fluxes, ra_cent, dec_cent, naxis1, naxis2, pixscale, restemp)
 #        byband[band] = (images,weights,fluxes)
-    coadd_assemble(tilename,restemp)     
+    coadd_assemble(tilename, restemp)
+
     return
 
 " -----------------  SWARP ----------------------- "
-def SWARPcaller(ilist,wlist,msklist,flist,ra_cent,dec_cent,naxis1,naxis2,pixscale,restemp):
+# TODO: This call signature is inconsistent with above!
+def SWARPcaller(ilist, wlist, msklist, flist, ra_cent, dec_cent, naxis1, naxis2, pixscale, restemp):
     imName = restemp +'_sci.fits'
     weightName = restemp +'_wgt.fits'
     maskName = restemp +'_msk.fits'
@@ -90,17 +97,16 @@ def SWARPcaller(ilist,wlist,msklist,flist,ra_cent,dec_cent,naxis1,naxis2,pixscal
     print "input images %d weights %d scales %d \n" % (len(tokens),len(tokens1),len(tokens2))
     print "images %s \n" % ilist
     print "weights %s \n" % wlist
-    print "scales %s \n" % flist        
+    print "scales %s \n" % flist
     command = ['swarp',"@%s"%ilist]
     command +=['-NTHREADS','1','-c',os.path.join('./','etc','Y3A1_v1_swarp.config')]
-        
     command +=["-PIXEL_SCALE","%f" % pixscale]
     command +=["-CENTER","%f,%f"%(ra_cent,dec_cent)]
     command +=['-IMAGE_SIZE',"%d,%d"%(naxis1,naxis2)]
     command +=["-BLANK_BADPIXELS","Y"]
     command +=["-BLANK_BADPIXELS","Y"]
     command +=["-DELETE_TMPFILES","Y"]
-    command +=["-COMBINE","Y","-COMBINE_TYPE","WEIGHTED"] 
+    command +=["-COMBINE","Y","-COMBINE_TYPE","WEIGHTED"]
     command +=["-IMAGEOUT_NAME",imName]
     command +=["-WEIGHTOUT_NAME",weightName]
     command +=["-FSCALE_DEFAULT","@%s"%flist]
@@ -108,12 +114,13 @@ def SWARPcaller(ilist,wlist,msklist,flist,ra_cent,dec_cent,naxis1,naxis2,pixscal
     command +=["-COPY_KEYWORDS","BUNIT,TILENAME,TILEID"]
 
     try:
-        subprocess.check_output(command)  
+        subprocess.check_output(command)
     except subprocess.CalledProcessError as e:
         print "error %s"% e
-    " Now make a mask image "        
+
+    " Now make a mask image "
     command = ['swarp',"@%s"%ilist]
-    command +=['-NTHREADS','1','-c',os.path.join('./','etc','Y3A1_v1_swarp.config')]       
+    command +=['-NTHREADS','1','-c',os.path.join('./','etc','Y3A1_v1_swarp.config')]
     command +=["-PIXEL_SCALE","%f"%pixscale]
     command +=["-CENTER","%f,%f"%(ra_cent,dec_cent)]
     command +=['-IMAGE_SIZE',"%d,%d"%(naxis1,naxis2)]
@@ -127,7 +134,7 @@ def SWARPcaller(ilist,wlist,msklist,flist,ra_cent,dec_cent,naxis1,naxis2,pixscal
     command +=["-COPY_KEYWORDS","BUNIT,TILENAME,TILEID"]
 
     try:
-        subprocess.check_output(command)  
+        subprocess.check_output(command)
     except subprocess.CalledProcessError as e:
         print "error %s"% e
     if os.path.exists(tmpImName):
@@ -151,11 +158,11 @@ def coadd_assemble(tilename,restemp):
     print commandN
 
     try:
-        subprocess.check_output(commandN)  
+        subprocess.check_output(commandN)
     except subprocess.CalledProcessError as e:
         print "error %s"% e
-        
-""" -------- create list of files for SWARP 
+
+""" -------- create list of files for SWARP
 need to be modified after injection will be implemented  ------------ """
 def create_swarp_lists(args,band):
 
@@ -170,43 +177,50 @@ def create_swarp_lists(args,band):
 
     flistP = str(datadir)+'/lists/'
     filename = tilename+'_'+band+'_nullwt-flist-'+medsconf+'.dat'
-    flistF = flistP+filename
+    flistF = os.path.join(flistP, filename)
 
+    # TODO: Figure out if these extensions are correct!
+    # Otherplaces, the correct extensions are:
+    # {im:0, wgt:1, wgt_me:2, msk:3}
     imext = "[0]"
-    mskext = "[1]"
-    wext = "[2]"
-    list_imF = outpathL+'/'+tilename+'_'+band+'_im.list'
-    list_wtF = outpathL+'/'+tilename+'_'+band+'_wt.list'
-    list_mskF = outpathL+'/'+tilename+'_'+band+'_msk.list'      
-    list_fscF = outpathL+'/'+tilename+'_'+band+'_fsc.list'
+    wext = "[1]"
+    mskext = "[2]"
+    list_imF = os.path.join(outpathL, tilename+'_'+band+'_im.list')
+    list_wtF = os.path.join(outpathL, tilename+'_'+band+'_wt.list')
+    list_mskF = os.path.join(outpathL, tilename+'_'+band+'_msk.list')
+    list_fscF = os.path.join(outpathL, tilename+'_'+band+'_fsc.list')
     fim = open(list_imF,'w')
     fwt = open(list_wtF,'w')
     scf = open(list_fscF,'w')
     mskf = open(list_mskF,'w')
     first = True
-    for line in open(flistF,'r'):
-        fname = line.split()[0]
-        zerp = float(line.split()[1])
-        if first:
-            flxscale      = 10.0**(0.4*(magbase - zerp))
-            fim.write(str(fname+imext)+'\n')
-            fwt.write(str(fname+wext)+'\n')
-            mskf.write(str(fname+mskext)+'\n')
-            scf.write(str(flxscale)+'\n')
-            first = False
-        else:
-            flxscale      = 10.0**(0.4*(magbase - zerp))
-            fim.write(str(fname+imext)+'\n')
-            fwt.write(str(fname+wext)+'\n')
-            mskf.write(str(fname+mskext)+'\n')
-            scf.write(str(flxscale)+'\n')
+
+    with open(flistF, 'r') as f:
+        for line in f:
+            fname = line.split()[0]
+            zerp = float(line.split()[1])
+            # TODO: Are these conditionals identical?
+            if first:
+                flxscale      = 10.0**(0.4*(magbase - zerp))
+                fim.write(str(fname+imext)+'\n')
+                fwt.write(str(fname+wext)+'\n')
+                mskf.write(str(fname+mskext)+'\n')
+                scf.write(str(flxscale)+'\n')
+                first = False
+            else:
+                flxscale      = 10.0**(0.4*(magbase - zerp))
+                fim.write(str(fname+imext)+'\n')
+                fwt.write(str(fname+wext)+'\n')
+                mskf.write(str(fname+mskext)+'\n')
+                scf.write(str(flxscale)+'\n')
     fim.close()
     fwt.close()
     mskf.close()
     scf.close()
-    return (list_imF,list_wtF,list_fscF,list_mskF)        
 
-" ---------------- run s-extractor to create objects catalog --------- "        
+    return (list_imF, list_wtF, list_fscF, list_mskF)
+
+" ---------------- run s-extractor to create objects catalog --------- "
 def makeCatalog(inpar):
 #    BalP, band = args
 #    BalP.makeCatalog(band)
@@ -217,15 +231,14 @@ def makeCatalog(inpar):
     naxis1 = args['naxis1']
     naxis2 = args['naxis2']
     pixscale = args['pixscale']
-   
     outpath = args['outpath']
     logpath = args['logpath']
     tilename = args['tilename']
     restemp = outpath+'/'+tilename
-    logfile = logpath+'/'+tilename    
+    logfile = logpath+'/'+tilename
     SEXcaller(restemp,band,logfile)
-    
-" -------------SEX ------------------- "    
+
+" -------------SEX ------------------- "
 def SEXcaller(restemp,band,logtemp):
         logFile = logtemp+'_'+band+'_sextractor.log'
 
@@ -240,24 +253,22 @@ def SEXcaller(restemp,band,logtemp):
         command+=['-MAG_ZEROPOINT', '30', '-DEBLEND_MINCONT', '0.001', '-DETECT_THRESH', '1.1',  '-ANALYSIS_THRESH', '1.1']
         command+=['-CHECKIMAGE_TYPE', 'SEGMENTATION', '-CHECKIMAGE_NAME', restemp+'_'+band+'_segmap.fits']
         command+=['-FLAG_IMAGE', "%s"%flagim]
-#
         command+=['-WEIGHT_TYPE','MAP_WEIGHT']
         command+=['-PARAMETERS_NAME', os.path.join('./','etc','balrog_sex.param')]
         command+=['-FILTER_NAME', os.path.join('./','etc','gauss_3.0_7x7.conv')]
-        
-           
-        print "command= %s \n" % command
-        try:
 
+        print "command= %s \n" % command
+
+        try:
             output,error = subprocess.Popen(command,stdout = subprocess.PIPE, stderr= subprocess.PIPE).communicate()
 
         except subprocess.CalledProcessError as e:
             print "error %s"% e
+
         flog.write(output)
-        flog.write(error)    
+        flog.write(error)
 
-
-        flog.close()   
+        flog.close()
 
 """ create a list of random numbers to be used as seeds """
 def makeSeedList(nchunks):
@@ -267,8 +278,8 @@ def makeSeedList(nchunks):
     for c in range(0,nchunks):
        seedlist.append(int(arrayV[c]*10000))
     return seedlist
-    
-" Method to run mads maker ----------- "        
+
+" Method to run mads maker ----------- "
 def makeMeds(inpar):
     args = inpar[0]
     band = inpar[1]
@@ -277,16 +288,15 @@ def makeMeds(inpar):
     naxis1 = args['naxis1']
     naxis2 = args['naxis2']
     pixscale = args['pixscale']
-   
     outpath = args['outpath']
-    logpath = args['logpath'] 
+    logpath = args['logpath']
     medsdir = args['medsdir']
     medsconf = args['medsconf']
     tilename = args['tilename']
     confile = args['confile']
     datadir = args['datadir']
     restemp = outpath+'/'+tilename
-    logfile = logpath+'/'+tilename    
+    logfile = logpath+'/'+tilename
     fname = datadir+'/lists/'+tilename+'_'+band+'_fileconf-'+medsconf+'.yaml'
     with open(fname,'r') as fconf:
         conf=yaml.load( fconf)
@@ -301,15 +311,14 @@ def makeMeds(inpar):
         conf['coadd_cat_url'] = cat_url
         conf['coadd_seg_url'] = seg_url
         with open(fname, 'w') as conf_f:
-            yaml.dump(conf, conf_f) 
+            yaml.dump(conf, conf_f)
         command = ['desmeds-make-meds-desdm',confile,fname]
         print command
         try:
             subprocess.check_output(command)
         except:
             print "on meds for band %s \n" % band
-            
-            
+
 " The method to create one sof chunk to be run by pool "
 def makeChunk(inpar):
     " create sof chunk  "
@@ -334,8 +343,8 @@ def makeChunk(inpar):
     command += [mofconf,mofdir+'/'+tilename+'_sof-chunk-01.fits','--seed','%d' %seedN]
     command[4] = str(cnum)
     wrange=int(cnum)
-    nranges=16 
-    command[16] = mofdir+'/'+tilename+'_sof-chunk-'+('%02d'%cnum)+'.fits' 
+    nranges=16
+    command[16] = mofdir+'/'+tilename+'_sof-chunk-'+('%02d'%cnum)+'.fits'
 #
     print command
     res=''
@@ -343,10 +352,10 @@ def makeChunk(inpar):
         res=subprocess.check_output(command)
     except:
         print "failed to run run_ngmixit \n"
-    print res   
+    print res
 
 class BalrogPipelineSof():
-    
+
     def __init__(self, confile, tilename, mof_conf):
         '''
         Constructor
@@ -397,10 +406,10 @@ class BalrogPipelineSof():
     def getRealisations(self):
         self.realisationslist  = os.listdir(self.simData)
         return self.realisationslist
-            
+
     def setArgs(self,**args):
         self.inargs = args
-        
+
     def ConfigMap(self):
         dict1 = {}
         dict1['MEDS_DATA'] = self.medsdir
@@ -411,11 +420,11 @@ class BalrogPipelineSof():
         dict1['TILEINFO'] = self.tileinfo
         dict1['TILEDIR'] = self.tiledir
         dict1['MOFDIR'] = self.mofdir
-        
-        return dict1     
+
+        return dict1
 
     """ establish connection to the database """
-    def connectDB(self):        
+    def connectDB(self):
         self.user = self.desconfig.get('db-' + self.dbname, 'user')
         self.dbhost = self.desconfig.get('db-' + self.dbname, 'server')
         self.port = self.desconfig.get('db-' + self.dbname, 'port')
@@ -424,7 +433,7 @@ class BalrogPipelineSof():
         self.dsn = cx_Oracle.makedsn(**kwargs)
         if not self.quiet: print('Connecting to DB ** %s ** ...' % self.dbname)
         connected = False
-        
+
         for tries in range(3):
             try:
                 self.con = cx_Oracle.connect(self.user, self.password, dsn=self.dsn)
@@ -440,7 +449,7 @@ class BalrogPipelineSof():
             print('\n ** Could not successfully connect to DB. Try again later. Aborting. ** \n')
             os._exit(0)
         self.cur = self.con.cursor()
-        
+
     def read_config(self,confile):
         """
         read the  config file
@@ -451,14 +460,13 @@ class BalrogPipelineSof():
             Name of DESDM databese to query tile info as 'desoper'
         """
 
-
         print("reading:",confile)
+
         with open(confile) as parf:
             data=yaml.load(parf)
 
-
         return data
-    
+
     def get_tile_infor(self):
         coadd_tile_table = 'COADDTILE_GEOM'
         if self.dbname == 'desoper':
@@ -478,7 +486,6 @@ class BalrogPipelineSof():
 
     def create_swarp_lists(self,band,outpath,listpath):
 #        outpath = './coadd/'+self.tilename+'/lists/'
-        
         outpathL = listpath
         if not os.path.exists(outpathL):
             os.makedirs(outpathL)
@@ -486,12 +493,18 @@ class BalrogPipelineSof():
         filename = self.tilename+'_'+band+'_nullwt-flist-'+self.medsconf+'.dat'
         flistF = flistP+filename
         print "Flist file = %s \n" % flistF
+        # TODO: Sort these values out!
+        # OLD: im:0, msk:1, wgt:2
+        # NEW: im:0, wgt:1, msk:2
+        # imext = "[0]"
+        # mskext = "[1]"
+        # wext = "[2]"
         imext = "[0]"
+        wext = "[1]"
         mskext = "[1]"
-        wext = "[2]"
         list_imF = outpathL+self.tilename+'_'+band+'_im.list'
         list_wtF = outpathL+self.tilename+'_'+band+'_wt.list'
-        list_mskF = outpathL+self.tilename+'_'+band+'_msk.list'      
+        list_mskF = outpathL+self.tilename+'_'+band+'_msk.list'
         list_fscF = outpathL+self.tilename+'_'+band+'_fsc.list'
         fim = open(list_imF,'w')
         fwt = open(list_wtF,'w')
@@ -518,7 +531,7 @@ class BalrogPipelineSof():
         fwt.close()
         mskf.close()
         scf.close()
-        return (list_imF,list_wtF,list_fscF,list_mskF)
+        return (list_imF, list_wtF, list_fscF, list_mskF)
 
     def create_det_list(self,restemp):
         im_list = ''
@@ -537,9 +550,9 @@ class BalrogPipelineSof():
             else:
                 im_list += ','+im_file
                 msk_list += ','+str(msk_file)
-                wt_list += ','+wt_file 
+                wt_list += ','+wt_file
         return (im_list,wt_list,msk_list)
-     
+
     def makeCoadd(self,band,outpath,tilepath):
         logpath = outpath+'/LOGS/'
         listpath = outpath+'/lists/'
@@ -558,32 +571,36 @@ class BalrogPipelineSof():
         (images,weights,masks,fluxes) = self.create_swarp_lists(band,outpath,listpath)
         self.SWARPcaller(images,weights,fluxes,masks,ra_cent,dec_cent,naxis1,naxis2,restemp)
 #        byband[band] = (images,weights,fluxes)
-        self.coadd_assemble(restemp)     
-        
+        self.coadd_assemble(restemp)
+
     """ call swarp to create a stamp if more than one ccd """
     def SWARPcaller(self,ilist,wlist,msklist,flist,ra_cent,dec_cent,naxis1,naxis2,restemp):
         imName = restemp +'_sci.fits'
         weightName = restemp +'_wgt.fits'
         maskName = restemp +'_msk.fits'
         tmpImName = restemp +'_tmp_sci.fits'
+
         print "imName=%s weightName=%s \n" % (imName,weightName)
+
         tokens= ilist.split(',')
         tokens1 = wlist.split(',')
         tokens2 = flist.split(',')
+
         print "input images %d weights %d scales %d \n" % (len(tokens),len(tokens1),len(tokens2))
         print "images %s \n" % ilist
         print "weights %s \n" % wlist
-        print "scales %s \n" % flist        
+        print "scales %s \n" % flist
+
         command = ['swarp',"@%s"%ilist]
         command +=['-NTHREADS','1','-c',os.path.join('./','etc','Y3A1_v1_swarp.config')]
-        
+
         command +=["-PIXEL_SCALE","%f"%self.pixscale]
         command +=["-CENTER","%f,%f"%(ra_cent,dec_cent)]
         command +=['-IMAGE_SIZE',"%d,%d"%(naxis1,naxis2)]
         command +=["-BLANK_BADPIXELS","Y"]
         command +=["-BLANK_BADPIXELS","Y"]
         command +=["-DELETE_TMPFILES","Y"]
-        command +=["-COMBINE","Y","-COMBINE_TYPE","WEIGHTED"] 
+        command +=["-COMBINE","Y","-COMBINE_TYPE","WEIGHTED"]
         command +=["-IMAGEOUT_NAME",imName]
         command +=["-WEIGHTOUT_NAME",weightName]
         command +=["-FSCALE_DEFAULT","@%s"%flist]
@@ -591,12 +608,13 @@ class BalrogPipelineSof():
         command +=["-COPY_KEYWORDS","BUNIT,TILENAME,TILEID"]
 
         try:
-            subprocess.check_output(command)  
+            subprocess.check_output(command)
         except subprocess.CalledProcessError as e:
             print "error %s"% e
-        " Now make a mask image "        
+
+        " Now make a mask image "
         command = ['swarp',"@%s"%ilist]
-        command +=['-NTHREADS','1','-c',os.path.join('./','etc','Y3A1_v1_swarp.config')]       
+        command +=['-NTHREADS','1','-c',os.path.join('./','etc','Y3A1_v1_swarp.config')]
         command +=["-PIXEL_SCALE","%f"%self.pixscale]
         command +=["-CENTER","%f,%f"%(ra_cent,dec_cent)]
         command +=['-IMAGE_SIZE',"%d,%d"%(naxis1,naxis2)]
@@ -610,12 +628,12 @@ class BalrogPipelineSof():
         command +=["-COPY_KEYWORDS","BUNIT,TILENAME,TILEID"]
 
         try:
-            subprocess.check_output(command)  
+            subprocess.check_output(command)
         except subprocess.CalledProcessError as e:
             print "error %s"% e
         if os.path.exists(tmpImName):
             os.remove(tmpImName)
-            
+
     def CombineFits(self,resFile,simFile,origFile):
         template = resFile.split('/')[-1]
         restemp = template.split('.fits')[0]
@@ -634,7 +652,7 @@ class BalrogPipelineSof():
         if os.path.exists(resFile):
             os.remove(resFile)
         fits = fitsio.FITS(resFile,'rw')
-        
+
         fits.write( sciIm,header=imHdr)
 
         fits.write(mskIm,header=mskHdr)
@@ -669,7 +687,7 @@ class BalrogPipelineSof():
         print commandN
 
         try:
-            subprocess.check_output(commandN)  
+            subprocess.check_output(commandN)
         except subprocess.CalledProcessError as e:
             print "error %s"% e
 
@@ -693,8 +711,7 @@ class BalrogPipelineSof():
         command+=['-WEIGHT_TYPE','MAP_WEIGHT']
         command+=['-PARAMETERS_NAME', os.path.join('./','etc','balrog_sex.param')]
         command+=['-FILTER_NAME', os.path.join('./','etc','gauss_3.0_7x7.conv')]
-        
-           
+
         print "command= %s \n" % command
         try:
 
@@ -703,12 +720,12 @@ class BalrogPipelineSof():
         except subprocess.CalledProcessError as e:
             print "error %s"% e
         flog.write(output)
-        flog.write(error)    
+        flog.write(error)
 
 
         flog.close()
-        
-    """ Use swarp to make detection image """        
+
+    """ Use swarp to make detection image """
     def MakeDetImage(self,ilist,wlist,msklist,ra_cent,dec_cent,naxis1,naxis2,restemp):
         imName = restemp+'_det_sci.fits'
         weightName = restemp+'_det_wgt.fits'
@@ -721,36 +738,36 @@ class BalrogPipelineSof():
         command +=["-CENTER_TYPE","MANUAL","-CENTER","%s,%s"%(ra_cent,dec_cent)]
         command +=['-IMAGE_SIZE',"%d,%d"%(naxis1,naxis2)]
         command +=["-RESAMPLE","N","-BLANK_BADPIXELS","Y"]
-        command +=["-COMBINE_TYPE","CHI-MEAN"] 
+        command +=["-COMBINE_TYPE","CHI-MEAN"]
         command +=["-IMAGEOUT_NAME",imName]
         command +=["-WEIGHTOUT_NAME",weightName]
         command +=["-WEIGHT_IMAGE","%s"%wlist]
         command +=["-COPY_KEYWORDS","BUNIT,TILENAME,TILEID"]
         try:
-            subprocess.check_output(command)  
+            subprocess.check_output(command)
         except subprocess.CalledProcessError as e:
             print "error %s"% e
-        " Now compose detection mask "    
+        " Now compose detection mask "
         command = ['swarp',"%s"%ilist]
-        command +=['-NTHREADS','1','-c',os.path.join('./','etc','Y3A1_v1_swarp.config')]       
+        command +=['-NTHREADS','1','-c',os.path.join('./','etc','Y3A1_v1_swarp.config')]
         command +=["-PIXEL_SCALE","%f"%self.pixscale]
         command +=["-CENTER","%f,%f"%(ra_cent,dec_cent)]
         command +=['-IMAGE_SIZE',"%d,%d"%(naxis1,naxis2)]
         command +=["-RESAMPLE","N","-BLANK_BADPIXELS","Y"]
-        command +=["-COMBINE_TYPE","CHI-MEAN"] 
+        command +=["-COMBINE_TYPE","CHI-MEAN"]
         command +=["-IMAGEOUT_NAME",tmpImName]
         command +=["-WEIGHTOUT_NAME",mskName]
         command +=["-WEIGHT_IMAGE","%s"%msklist]
-        command +=["-COPY_KEYWORDS","BUNIT,TILENAME,TILEID"] 
+        command +=["-COPY_KEYWORDS","BUNIT,TILENAME,TILEID"]
         print command
         try:
-            subprocess.check_output(command)  
+            subprocess.check_output(command)
         except subprocess.CalledProcessError as e:
             print "error %s"% e
         if os.path.exists(tmpImName):
-            os.remove(tmpImName)  
-            
-    " Clean coadd files we do not need any more " 
+            os.remove(tmpImName)
+
+    " Clean coadd files we do not need any more "
     def cleanCoadds(self,coaddir):
         scifiles = glob.glob(coaddir+'/*_sci.fits')
         for sciF in scifiles:
@@ -761,7 +778,7 @@ class BalrogPipelineSof():
         wgtfiles = glob.glob(coaddir+'/*_wgt.fits')
         for wgtF in wgtfiles:
             os.remove(wgtF)
-                    
+
     " read catalog to find its length and create a fake objmap"
     def make_fake_objmap(self,catfile,fname):
         fitsio.read(catfile)
@@ -770,20 +787,20 @@ class BalrogPipelineSof():
         # sort just in case, not needed ever AFIK
         q = numpy.argsort(coadd_cat['number'])
         coadd_cat = coadd_cat[q]
-        nobj = len(coadd_cat) 
-        print " Number of objects in the cat = %d \n" % nobj 
+        nobj = len(coadd_cat)
+        print " Number of objects in the cat = %d \n" % nobj
         # now write some data
         if os.path.exists(fname):
             os.remove(fname)
         fits = fitsio.FITS(fname,'rw')
 
         data = numpy.zeros(nobj, dtype=[('object_number','i4'),('id','i8')])
-       
+
         data['object_number'] = [num for num in range(nobj)]
         data['id'] = [long(num) for num in range(nobj)]
 
         print("writing objmap:",fname)
-        fitsio.write(fname, data, extname='OBJECTS',clobber=True)  
+        fitsio.write(fname, data, extname='OBJECTS',clobber=True)
 
     def make_meds_list(self,datadir):
         mofdir = datadir + '/sof'
@@ -795,7 +812,7 @@ class BalrogPipelineSof():
             bandN = filename.split('_')[1]
             outF.write('%s %s \n' % (self.tiledir+'/'+filename,bandN))
         return medslF
-     
+
     def make_psf_map(self,datadir):
         psfmapF = datadir +'/'+self.tilename+'_all_psfmap.dat'
         if os.path.exists(psfmapF):
@@ -819,7 +836,6 @@ class BalrogPipelineSof():
                 outF.write('%s \n' % fileN)
         outF.close()
         return chunklistF
-     
 
     def collate_chunks(self,datadir):
         chunklistF = self.makeChunkList(datadir)
@@ -830,7 +846,7 @@ class BalrogPipelineSof():
             subprocess.check_output(command)
         except:
             print "failed to collate chunks \n"
-            
+
     def make_meds_list(self,datadir):
         mofdir=datadir+'/sof'
         medslF = mofdir+'/meds_list.txt'
@@ -840,8 +856,8 @@ class BalrogPipelineSof():
             filename = line.split('/')[-1]
             bandN = filename.split('_')[1]
             outF.write('%s %s \n' % (datadir+'/'+filename,bandN))
-        return medslF    
-    
+        return medslF
+
     def getMofPars(self,datadir):
         mofdir = datadir + '/sof'
         psfmapF = datadir +'/'+self.tilename+'_all_psfmap.dat'
@@ -854,9 +870,9 @@ class BalrogPipelineSof():
         pars['tilename'] = self.tilename
         pars['psfmap'] = psfmapF
         pars['medslist'] = medslF
-        pars['mofconf'] = self.mofconfile 
+        pars['mofconf'] = self.mofconfile
         return pars
-        
+
     def make_nbrs_data(self,datadir):
         " First create mads list "
         mofdir = datadir+'/sof'
@@ -873,7 +889,7 @@ class BalrogPipelineSof():
             subprocess.check_output(command)
         except:
             print "failed to run run_ngmixer-meds-make-nbrs-data \n"
-            
+
     def make_psf_map(self,datadir):
         psfmapF = datadir +'/'+self.tilename+'_all_psfmap.dat'
         if os.path.exists(psfmapF):
@@ -885,13 +901,11 @@ class BalrogPipelineSof():
                 outF.write(line)
         outF.close()
         return psfmapF
-        
-    
-                
-    " This is the sequence of command composing the pipeline "    
+
+    " This is the sequence of command composing the pipeline "
     def prepMeds(self):
         "  First run desmeds-prep-tile "
-        
+
         for band in self.bands:
             command = [self.bbase+'/bin/desmeds-prep-tile',self.medsconf,self.tilename,band]
             print command
@@ -899,23 +913,22 @@ class BalrogPipelineSof():
                 subprocess.check_output(command)
             except:
                 print "failed to copy files for band %s \n" % band
-   
+
         if not os.path.exists(self.outpath):
             os.makedirs(self.outpath)
         if not os.path.exists(self.logpath):
             os.makedirs(self.logpath)
-            
-    def makeIngection(self):
+
+    def makeInjection(self):
         " At this point we need to include the image injection commands "
-        "                                                               "
-        "                                                               "     
+
         " prepare information for the coadd tile "
-        
+
     def getCoaddPars(self,datadir):
         outpath = datadir+'/coadd/'
         logpath = outpath +'/LOGS/'
         outpathL = outpath+'/lists/'
-        
+
         pard = {}
         pard['ra_cent'] = self.tileinfo['RA_CENT']
         pard['dec_cent'] = self.tileinfo['DEC_CENT']
@@ -923,7 +936,7 @@ class BalrogPipelineSof():
         pard['naxis2'] = self.tileinfo['NAXIS2']
         self.pixscale = self.tileinfo['PIXELSCALE']
         pard['pixscale'] = self.pixscale
-        
+
         if not os.path.exists(outpath):
             os.makedirs(outpath)
         if not os.path.exists(logpath):
@@ -941,7 +954,7 @@ class BalrogPipelineSof():
         pard['magbase'] = self.magbase
         pard['confile'] = self.confile
         return pard
-    
+
     def run(self):
         self.prepMeds()
         byband = {}
@@ -967,8 +980,7 @@ class BalrogPipelineSof():
             " Now crete meds for all bands "
             for band in self.bands:
                 self.makeMeds(band,realD)
-            
-            
+
     " Prepare data for meds run on simulated images "
     def prepInData(self):
         " make list of realisations "
@@ -995,19 +1007,17 @@ class BalrogPipelineSof():
             " now copy common files "
             psffiles = glob.glob(self.tiledir+'/*.dat')
             for datF in psffiles:
-                dstF = datF.split('/')[-1] 
+                dstF = datF.split('/')[-1]
                 shutil.copyfile(datF, self.realDir+'/'+dstF)
             " Copy list files "
             listFiles = glob.glob(self.tiledir+'/lists/*')
-#            newLists = []
             for listF in listFiles:
                 destF = listF.split('/')[-1]
-#                newLists.append(destF)
                 if listF.find('nullwt') > 0:
                     self.changeList(listF,self.tiledir,self.realDir)
                 else:
                     shutil.copyfile(listF, self.realDir+'/lists/'+destF)
- 
+
             " now nullweight images are prepared in injection step "
             for band in self.bands:
                 " We just need to copy and rename injected files in nullweight "
@@ -1020,7 +1030,7 @@ class BalrogPipelineSof():
                     shutil.copyfile(fileN, dstDir+dstFN)
                 " Finally correct file config yaml "
                 self.YamlCorrect(band,self.realDir)
-            
+
     def YamlCorrect(self,band,realDir):
         listDir = realDir+'/lists/'
         fileName = self.tilename+'_'+str(band)+'_fileconf-'+self.medsconf+'.yaml'
@@ -1040,12 +1050,8 @@ class BalrogPipelineSof():
         line = realDir +'/'+medsF
         conf['meds_url'] = line
         with open(fileList, 'w') as conf_f:
-            yaml.dump(conf, conf_f) 
-# 
-                
+            yaml.dump(conf, conf_f)
 
-        
-                
     def changeList(self,listF,srcDir,realDir):
         "  change path in each list "
         outFile = realDir+'/lists/' + listF.split('/')[-1]
@@ -1056,9 +1062,8 @@ class BalrogPipelineSof():
             outF.write(newline)
         outF.close()
 
-                
-    def makeObjMaps(self,outpath):  
-        print "makeObjMaps outpath=%s \n" % outpath     
+    def makeObjMaps(self,outpath):
+        print "makeObjMaps outpath=%s \n" % outpath
         for band in self.bands:
 #            fname = os.path.join(outpath,'/lists/'+self.tilename+'_'+band+'_objmap-'+self.medsconf+'.fits')
             fname = shutil.abspath(outpath) + '/lists/'+self.tilename+'_'+band+'_objmap-'+self.medsconf+'.fits'
@@ -1068,7 +1073,7 @@ class BalrogPipelineSof():
             if os.path.exists(fname):
                 os.remove(fname)
             self.make_fake_objmap(catname, fname)
- 
+
     def makeMeds(self,band,outpath):
         fname = outpath +'/lists/'+self.tilename+'_'+band+'_fileconf-'+self.medsconf+'.yaml'
         with open(fname,'r') as fconf:
@@ -1084,15 +1089,15 @@ class BalrogPipelineSof():
         conf['coadd_cat_url'] = cat_url
         conf['coadd_seg_url'] = seg_url
         with open(fname, 'w') as conf_f:
-            yaml.dump(conf, conf_f) 
+            yaml.dump(conf, conf_f)
         command = [self.bbase+'/bin/desmeds-make-meds-desdm',self.confile,fname]
         print command
         try:
             subprocess.check_output(command)
         except:
             print "on meds for band %s \n" % band
-              
-    def makeDetectionImage(self,outpathR):   
+
+    def makeDetectionImage(self,outpathR):
         print " Images are created start with detection image \n"
         "Now we have coadd images let's make detection one "
         restemp = outpathR+'/'+self.tilename
@@ -1105,23 +1110,22 @@ class BalrogPipelineSof():
         (im_list,wt_list,msk_list) = self.create_det_list(restemp)
 
         restemp =  outpathR+'/'+self.tilename
-        self.MakeDetImage(im_list,wt_list,msk_list,ra_cent,dec_cent,naxis1,naxis2,restemp) 
+        self.MakeDetImage(im_list,wt_list,msk_list,ra_cent,dec_cent,naxis1,naxis2,restemp)
         restemp = outpathR +'/'+self.tilename+'_det'
 
         self.coadd_assemble(restemp)
-    
-    " clean chunk file in the sof directory "    
+
+    " clean chunk file in the sof directory "
     def cleanChunks(self,datadir):
         chunklist = glob.glob(datadir+'/sof/*chunk*.fits')
         for chunkF in chunklist:
-            os.remove(chunkF)   
+            os.remove(chunkF)
 
- 
     def makeCatalog(self,band,outpath):
         restemp = outpath+'/'+self.tilename
-        logfile = outpath+'/LOGS/'+self.tilename    
+        logfile = outpath+'/LOGS/'+self.tilename
         self.SEXcaller(restemp,band,logfile)
-        
+
 if __name__ == "__main__":
     print sys.argv
     nbpar = len(sys.argv)
@@ -1155,10 +1159,10 @@ if __name__ == "__main__":
             print " -t <tile> - tile name"
             print " -m <sof conf file>"
             sys.exit(2)
-           
+
         elif opt in ("-c","--confile"):
             c_flag = 1
-            confile = arg 
+            confile = arg
         elif opt in ("-t","--tilename"):
             t_flag = 1
             tilename = arg
@@ -1178,21 +1182,19 @@ if __name__ == "__main__":
     balP = BalrogPipelineSof(confile,tilename,mofconf)
 #    balP.prepMeds()
     datadir = balP.tiledir
-     
+
     saveS = True
     print "save seeds ",saveS
     print "\n"
-    
 
     ncpu = len(balP.bands)#
 #
     args= balP.getCoaddPars(datadir)
     pars = [(args, band) for band in balP.bands ]
 #    print pars
-    
 
 #    pool = Pool(processes=ncpu)
-#    pool.map(makeCoadd, pars) 
+#    pool.map(makeCoadd, pars)
 #    pool.close()
 #    pool.join()
     coaddir = datadir+'/coadd'
@@ -1200,16 +1202,16 @@ if __name__ == "__main__":
 #    balP.makeDetectionImage(coaddir)
 #
 #    balP.cleanCoadds(coaddir)
-#    
+#
 #    pool = Pool(processes=ncpu)
 #    pool.map(makeCatalog,pars)
-#    
+#
 #    balP.makeObjMaps(datadir)
 #    pool.close()
 #    pool.join()
 #    pool = Pool(processes=ncpu)
 #    pool.map(makeMeds,pars)
-#    
+#
 #    pool.close()
 #    pool.join()
     nchunks = 16
@@ -1226,7 +1228,7 @@ if __name__ == "__main__":
     args['mofdir'] = datadir+'/sof'
     args['datadir'] = datadir
     args['seedlist'] = seedlist
-    
+
 #    balP.make_nbrs_data(datadir)
 
     pars = [(args, chunks) for chunks in range(1,17) ]
@@ -1234,8 +1236,8 @@ if __name__ == "__main__":
 #
 #    pool = Pool(processes=16)
 
-#    pool.map(makeChunk, pars) 
-      
+#    pool.map(makeChunk, pars)
+
 #    pool.close()
 #    pool.join()
 
@@ -1260,15 +1262,15 @@ if __name__ == "__main__":
 #    psf_dir = datadir
 #    tile_dir = basedir
 #    config_file = 'bal_config.yaml'
-   
+
 #    output_dir =  basedir
-#    command = "./Balrog-GalSim/balrog/balrog_injection.py -l %s -g %s -t %s -c %s   -o %s -v %s " % (tilelistS,geom_file,tile_dir,config_dir,output_dir,config_file) 
-    
+#    command = "./Balrog-GalSim/balrog/balrog_injection.py -l %s -g %s -t %s -c %s   -o %s -v %s " % (tilelistS,geom_file,tile_dir,config_dir,output_dir,config_file)
+
 #    print command
 #    res=''
 #    try:
 #        retval = subprocess.call(command.split(),stderr=subprocess.STDOUT)
-#        
+
 #    except subprocess.CalledProcessError as e:
 #        print "error %s"% e
 #        print retval
@@ -1279,34 +1281,34 @@ if __name__ == "__main__":
     basedir = str(balP.medsdir)+'/' + str(balP.medsconf)
     for real in reallist:
         datadir = basedir+'/balrog_images/' + str(real)+'/'+balP.tilename
-        
+
         ncpu = len(balP.bands)
-#
+
         args= balP.getCoaddPars(datadir)
         pars = [(args, band) for band in balP.bands ]
- 
+
         pool = Pool(processes=ncpu)
         pool.map(makeCoadd, pars) 
         pool.close()
         pool.join()
-#       
+
         coaddir = datadir+'/coadd'
         balP.makeDetectionImage(coaddir)
-#
+
         balP.cleanCoadds(coaddir)
-#    
+
         pool = Pool(processes=ncpu)
         pool.map(makeCatalog,pars)
-#    
+
         balP.makeObjMaps(datadir)
         pool.close()
         pool.join()
         pool = Pool(processes=ncpu)
         pool.map(makeMeds,pars)
-#    
+
         pool.close()
         pool.join()
-        
+
         seedlist = makeSeedList(nchunks)
         if saveS:
             with open('seedL2', 'wb') as fp:
@@ -1320,16 +1322,16 @@ if __name__ == "__main__":
         args['mofdir'] = datadir+'/sof'
         args['datadir'] = datadir
         args['seedlist'] = seedlist
-#    balP.run()  
-    
+#    balP.run()
+
         balP.make_nbrs_data(datadir)
 
         pars = [(args, chunks) for chunks in range(1,17) ]
 #        print pars
-#
+
         pool = Pool(processes=16)
-        pool.map(makeChunk, pars) 
-           
+        pool.map(makeChunk, pars)
+
         pool.close()
         pool.join()
 

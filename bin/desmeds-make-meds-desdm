@@ -23,7 +23,6 @@ parser.add_argument(
     help='json file holding file information',
 )
 
-
 def main():
     args=parser.parse_args()
 
