@@ -1183,7 +1183,7 @@ if __name__ == "__main__":
 #    balP.prepMeds()
     datadir = balP.tiledir
      
-    saveS = False
+    saveS = True
     print "save seeds ",saveS
     print "\n"
     
@@ -1216,7 +1216,7 @@ if __name__ == "__main__":
 #    
 #    pool.close()
 #    pool.join()
-#    nchunks = 16
+    nchunks = 16
 #    seedlist = makeSeedList(nchunks)
 #    if saveS:
 #    	with open('seedL1', 'wb') as fp:
